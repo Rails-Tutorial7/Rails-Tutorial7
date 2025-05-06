@@ -7,7 +7,7 @@ services:
       args:
         VARIANT: '3.1-bullseye'
         BUNDLER_VERSION: '2.3.14'
-        RAILS_VERSIONS: '7.0.3'
+        RAILS_VERSIONS: '7.1.0'
         NODE_VERSION: '16'
     environment:
       BINDING: 0.0.0.0
