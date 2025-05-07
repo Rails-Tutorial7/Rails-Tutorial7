@@ -12,6 +12,7 @@
   - Rails7.1.0 と互換性のある puma6.6 に変えることで解決
 
 - scaffold、全部入り自動生成魔法
+
   - `resources` も含まれてる！
   - 中身
     1. マイグレーションファイル(テーブル作成用)
@@ -20,3 +21,13 @@
     4. 基本的なビュー(一覧・詳細・作成・編集画面)
     5. テスト
     6. ルーティング(`resources`使用)
+
+- `rails destroy`で`rails generate`をまとめて取り消し
+
+- `rails test`には、アクションもビューも必要
+
+  - チュートリアルと表示が異なる
+  - `Expected response to be a <2XX: success>, but was a <406: Not Acceptable>`
+
+- `minitest/reporters`は読みやすくするための補助ヘルパー
+  - RSpec にも似たようなものがあった
