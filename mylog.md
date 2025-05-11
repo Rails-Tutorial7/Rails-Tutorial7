@@ -16,8 +16,8 @@
   - チュートリアルと表示が異なる (`Expected response to be a <2XX: success>, but was a <406: Not Acceptable>`)
   - ルート → コントローラにアクション追加 → ビューの順で追加していく
 
-- **`assert_response :unprocessable_entity` でのエラー**
-  - `ArgumentError: Invalid response name: unprocessable_entity` が発生
+- **`assert_response :422` でのエラー**
+  - `ArgumentError: Invalid response name: 422` が発生
   - シンボルを HTTP ステータスコードの数値 (`422`) に変更することで解決
     - 数値指定の方が普遍的なため、シンボル名で通らない場合でも数値なら通る可能性あり？
 
@@ -43,6 +43,7 @@
 - **Sass (Sassy CSS):**
   - Sassy ＝生意気な
 - duck typing に確かに助けられている
+- `rails db:seed`で`seeds.rb`のサンプルデータをたくさん作れるの便利
 
 ## 慣習・ルール
 
@@ -58,15 +59,19 @@
 ## テスト関連
 
 - **統合テスト (Integration Test):**
+
   - RSpec のシステムスペックと雰囲気が似ている
   - Rails の統合テストは、より HTTP レベルに近い連携テスト
   - RSpec のシステムスペックや Rails のシステムテストは、ブラウザ操作を伴う、よりエンドユーザーに近い E2E (End-to-End) テスト
+
+- fixture では ERB を使える
 
 ## モデル・DB 関連
 
 - **バリデーション:**
   - `uniqueness: { case_sensitive: false }`
   - `has_secure_password` メソッドには存在性バリデーションが含まれているが、空白だけのパスワードは検知できない
+    - 上記で存在性を検証しているため`allow_nil: true`を入れても新規ユーザー登録時に空白だけが有効になることはない
 
 ## セッション・ログイン関連
 
@@ -111,12 +116,72 @@
       - 例: `import "custom/menu"` (上記 `pin_all_from` の場合)
       - 例: `import "my_module"` (上記 `pin` の場合)
 
+- クラスメソッドとインスタンスメソッド
+
+  - クラスメソッド：
+    - メソッド名の前にクラス名. または`self.`（クラス定義の直下で使う場合）を付ける
+    - クラス名をレシーバー（メソッドを呼び出す対象）として呼び出す
+    - クラス全体、汎用的、特定のインスタンスに非依存
+  - インスタンスメソッド
+    - メソッド名の前に何も付けない
+    - クラスのインスタンス（オブジェクト）をレシーバーとして呼び出す
+    - 特定のインスタンスの状態操作、インスタンスに依存した処理
+
+- save → 変更のあった属性(attribute)を更新
+- update_attributes → 引数で指定した Hash オブジェクトで更新
+
+- 分岐をすべて書かずに処理を途中で終了するときの「早期脱出」というテクニック
+
+- メソッドの使い分け
+
+  - ヘルパーメソッド
+    - 主にビューの表示を助けるため
+    - 表示ロジック、データ整形、HTML 生成の簡略化
+    - 複数のビューやコントローラで共通して使える「表示」や「セッション管理」などの横断的な関心事
+  - モデル内メソッド
+  - 主にそのモデルのデータに関連するビジネスロジックやデータ操作のため
+  - データのバリデーション、データの変更、関連データの取得、そのモデル固有の振る舞い
+
+- 三項演算子
+
+  - `論理値? ? 何かをする : 別のことをする`
+
+- `assert_equal <期待する値>, <実際の値>`
+
+- `status: :see_other`
+
+  - Rails で Turbo を使うときは 303 See Other ステータスを指定する
+  - DELETE リクエスト後のリダイレクトが正しく振る舞うようにするため
+  - ちなみに Rails 7.1 以降なら scaffold で生成したコードに status: :see_other が付いている
+    - turbo-rails のバージョンが 1.3.0 以上 → data-turbo-method="delete"が指定されていても、内部的に POST でフォームを送信するように切り替えてくれる
+
+- `store_location`の store は保存する、蓄えるの意
+
+- test の言葉(RSpec との違い)
+
+  - RSpec の`expect`:
+    - `expect(実際の値).to eq(期待する値)` のように、「実際の値が期待する値と等しいことを期待する」
+    - マッチャー（eq, be_true, include など）と組み合わせる
+  - Minitest の`assert`系メソッド:
+    - この assert は「表明する」のニュアンスが強いっぽい、「こうあるべきだ！」的
+      - `assert_equal(期待する値, 実際の値)`: 2 つの値が等しいことを表明
+      - `assert(式)`: 式が真であることを表明
+      - `assert_not(式)`: 式が偽であることを表明
+      - `assert_nil(オブジェクト)`: オブジェクトが nil であることを表明
+      - `assert_redirected_to(パス)`: 指定されたパスにリダイレクトされたことを表明
+      - `assert_select(セレクタ, ...)`: HTML 要素が存在し、期待通りの内容であることを表明
+
+- ページネーション
+  - `will_paginate`と`bootstrap-will_paginate`
+  - `<%= will_paginate %>`
+  - コントローラで`paginate`メソッドを呼び出し(例：` @users = User.paginate(page: params[:page])`)
+
 # 後で詳しく調べたいことメモ
 
 - 5.2.1 アセットパイプラインという言葉そのものについて要再確認
 - パーシャルは自動生成せずに、エディタを使って手動で作成するのが一般的なのは何故
 - Active Record に対応する SQL コマンド
-- テスト駆動開発の red / green のリズム
+- テスト駆動開発の red / green のリズムは何故
 - `add_index`
 - `has_secure_password`
 - Sass のミックスイン（mixin）機能
@@ -124,3 +189,4 @@
 - セッションには Session モデルがない & Active Record のモデルを使っていない
 - Bootstrap の命名規則、グリッドシステム
 - コントローラ用のヘルパー、モデル用の concern
+- `digest`メソッド
