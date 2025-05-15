@@ -1,4 +1,4 @@
-# Rails チュートリアル学習記録
+# Rails チュートリアル学習記録 一周目投げっぱなし Ver.
 
 ## I. 実装上の変更点・トラブルシューティング
 
@@ -83,6 +83,7 @@
   - `条件式 ? 真の場合の値 : 偽の場合の値` の形式で、簡単な `if-else` を一行で簡潔に書ける
 - **シンボルと文字列:**
   - Rails ではハッシュのキーなどにシンボルがよく使われる パフォーマンスが良い、イミュータブルであるなどの特徴がある
+- Rails はデフォルトでは外部キーの名前を`<class>_id`として理解し、`<class>`に当たる部分からクラス名（正確には小文字に変換されたクラス名）を推測
 
 ### Rails の慣習・ルール
 
@@ -115,9 +116,40 @@
   - 例: `default_scope -> { order(created_at: :desc) }` (作成日時の降順をデフォルトにする)
   - `-> { ... }` はラムダ (無名関数) の記法
 - **`new` と `build` の違い (関連付けにおける):**
+
   - `Micropost.new(...)`: `Micropost` クラスの新しいインスタンスをメモリ上に作成 この時点では `user_id` は `nil`
   - `@user.microposts.build(...)`: `@user` に紐付いた `Micropost` クラスの新しいインスタンスをメモリ上に作成 この時点で、新しいマイクロポストの `user_id` には `@user.id` が自動的に設定される
   - どちらもデータベースにはまだ保存されず、保存するには `.save` メソッドが必要
+
+- `index` = 検索を高速化する秘密兵器
+
+  - **インデックスなし**: 全データチェック -> 遅い
+  - **インデックスあり**: 特定カラムの索引（B-tree）を利用 -> 速い
+    - 索引を見て、データ本体の場所へジャンプ
+  - B-tree: 効率的な検索のためのデータ構造
+    - 値がソートされて格納
+    - 階層をたどり、少ない比較回数で目的のデータに到達
+    - データ量が増えても検索速度の低下は緩やか
+
+- `has_many :through`
+
+  - `user.following`だけで、フォローしているユーザーのリストを簡単に取得できる
+    - **多対多**: ユーザーは多くの人をフォローでき、多くの人にフォローされる
+    - **中間テーブル**: `relationships`テーブル（`follower_id`, `followed_id`を持つ）が、誰と誰が繋がっているかの「関係性」を記録
+    - **`has_many :through`**: この中間テーブルを経由して、フォローしている/されている「ユーザー」の情報を取得する仕組み
+    - `user.following` の裏側 (Rails の動き)
+      - `user.following` を呼び出すと、Rails は 2 段階で動くイメージ
+        1.  **関係性の取得**:
+        - まず`user.active_relationships`(`has_many :active_relationships, class_name: "Relationship", foreign_key: "follower_id"`で定義された関連)を実行
+        - SQL イメージ: `SELECT * FROM relationships WHERE relationships.follower_id = #{user.id}`
+        - これで、そのユーザーが「誰を」フォローしているかの「関係性」レコード（`Relationship`オブジェクトの集まり）を relationships テーブルから取得
+        2.  **ユーザー情報の取得**:
+        - 1 で取得した各「関係性」レコードの `followed_id` を使う
+        - SQL イメージ: `SELECT * FROM users WHERE users.id IN (#{followed_idsのリスト})`
+        - これで実際にフォローされているユーザーの情報を users テーブルから取得
+
+- Rails では`includes`メソッドで eager loading を実現
+  - N+1 問題への対処
 
 ### コントローラ・ルーティング関連
 
@@ -162,7 +194,7 @@
 - **`request.referrer` メソッド:**
   - 一つ前にいたページの URL（リファラ）を取得できる マイクロポスト削除後など、元のページに戻りたい場合に便利
 
-### JavaScript (Importmap)
+#### JavaScript (Importmap)
 
 - **Importmap による JavaScript 導入の流れ:**
   1.  **前提確認:**
@@ -177,6 +209,53 @@
   4.  **`application.js`からインポート (`app/javascript/application.js`):**
       - 例: `import "custom/menu"` (上記`pin_all_from`の場合)
       - 例: `import "my_module"` (上記`pin`の場合)
+
+#### Hotwire (Turbo Stream)でページ部分更新
+
+- **処理の流れ**
+  1.  ボタンクリック → Turbo Stream リクエスト送信
+  2.  コントローラ: `respond_to` で `format.turbo_stream` を実行
+  3.  Rails: 対応する `アクション名.turbo_stream.erb` をレンダリング
+  4.  ブラウザ: `turbo_stream.update` の指示で指定 ID の要素内容を差し替え (ページ再読み込みなし)
+- Hotwire を使う場合のテストは`format: :turbo_stream`オプションを指定
+- **導入の流れ:**
+
+  1.  **コントローラ**: `respond_to` で Turbo Stream リクエストに対応
+
+      - `format.turbo_stream` を追加
+      - Turbo Stream テンプレートで使うデータはインスタンス変数 (`@user`) で渡す
+
+      ```ruby
+      # app/controllers/relationships_controller.rb
+      def create
+        @user = User.find(params[:followed_id])
+        current_user.follow(@user)
+        respond_to do |format|
+          format.html { redirect_to @user }
+          format.turbo_stream # Turbo Streamリクエスト時の処理
+        end
+      end
+      ```
+
+  2.  **ビュー**: 更新したい HTML 要素に CSS ID を付与
+
+      - 例: `<div id="follow_form">...</div>`
+      - 例: `<strong id="followers" class="stat">...</strong>`
+
+  3.  **Turbo Stream テンプレート作成 (`app/views/relationships/アクション名.turbo_stream.erb`)**:
+
+      - `turbo_stream.update "CSSのID" do ... end` で要素を置き換え
+      - ブロック内には新しい HTML（パーシャルを render することが多い）を記述
+
+      ```erb
+      <%# create.turbo_stream.erb %>
+      <%= turbo_stream.update "follow_form" do %>
+        <%= render partial: "users/unfollow" %>
+      <% end %>
+      <%= turbo_stream.update "followers" do %>
+        <%= @user.followers.count %>
+      <% end %>
+      ```
 
 ### テスト (Minitest)
 
@@ -215,17 +294,19 @@
 
 ## IV. 後で詳しく調べたいことメモ
 
-- アセットパイプラインという言葉そのものについて要再確認 (5.2.1 章)
+- アセットパイプラインという言葉そのものについて要再確認
 - パーシャルは自動生成せずに、エディタを使って手動で作成するのが一般的なのは何故か？ (Scaffold 以外の場合)
 - Active Record に対応する SQL コマンド (具体的にどのような SQL が発行されているか)
-- TDD の Red/Green のリズムのより深い理由や効果
+- TDD の Red/Green のリズムは何故
 - `add_index` の詳細な効果とユースケース
 - `has_secure_password` の内部実装の詳細
-- Sass のミックスイン（mixin）機能のより高度な使い方
-- `form_with` のオプションや挙動について、さらに多くのパターン
-- セッションが Active Record モデルではないことによる影響範囲や注意点
-- Bootstrap の命名規則、グリッドシステムの詳細
-- コントローラ用ヘルパーとモデル用`concern`の使い分け、設計思想
-- `digest`メソッドの他の用途や、セキュリティ的な側面
-- ラムダ (`->`) や Proc オブジェクトのより深い理解と活用例
-- `request.referrer` メソッドの挙動と、フレンドリーフォワーディング以外の利用シーン
+- Sass のミックスイン（mixin）機能
+- `form_with` 苦手
+- セッションには Session モデルがない & Active Record モデルではない
+- Bootstrap の命名規則、グリッドシステム
+- コントローラ用ヘルパーとモデル用`concern`の使い分け
+- `digest`メソッド
+- ラムダ (`->`)、Proc オブジェクト
+- `request.referrer` メソッド、フレンドリーフォワーディング以外いつ使うのか
+- Hotwire
+- SQL 思い出し
