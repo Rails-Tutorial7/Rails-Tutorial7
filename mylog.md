@@ -1,4 +1,4 @@
-# Rails チュートリアル学習記録 一周目投げっぱなし Ver.
+# Rails チュートリアル学習記録 一周目徒然なるままに Ver.
 
 ## I. 実装上の変更点・トラブルシューティング
 
@@ -28,15 +28,16 @@
     - 数値指定の方が普遍的なため、シンボル名で通らない場合でも数値なら通る可能性あり？
 
 - **`ActiveRecord::StatementInvalid: SQLite3::BusyException: database is locked` エラー**
-  - `test/test_helper.rb` 内の `parallelize(workers: :number_of_processors, with: :threads)` をコメントアウトすることで解決 (並列実行に起因する SQLite のロック問題)
+  - `test/test_helper.rb` 内の `parallelize(workers: :number_of_processors, with: :threads)` をコメントアウトすることで解決
+  - 並列実行に起因する SQLite のロック問題らしい
 
 ## II. Rails の便利機能・思想・用語
 
 ### Rails の基本機能
 
 - **Scaffold:**
-  - 「足場」の意味 開発の雛形を自動生成する強力なコマンド
-  - 生成されるもの:
+  - 「足場」の意、開発の雛形の自動生成魔法
+  - 中身:
     1.  マイグレーションファイル (テーブル定義)
     2.  モデル
     3.  コントローラー (CRUD アクション一式: `index`, `show`, `new`, `create`, `edit`, `update`, `destroy`)
@@ -45,23 +46,26 @@
     6.  ルーティング (`resources` を使用)
 - **`rails destroy`:**
   - `rails generate` で生成したファイル群をまとめて削除（取り消し）できる
-- **アセットパイプライン (Asset Pipeline):** (5.1.1 章)
+- **アセットパイプライン (Asset Pipeline):**
   - 本番環境で CSS や JavaScript ファイルを結合・圧縮し、ブラウザへの配信を効率化する仕組み
   - 開発時は個別のファイルとして扱えるが、本番では最適化される
-  - ビューで画像を参照する際、`image_tag` ヘルパーを使えば、アセットパイプラインがよしなにしてくれるので、`src` 属性に `"images/"` のようなディレクトリ名を含める必要はない (含めると読み込まれないことがある)
+  - ビューで画像を参照する際`image_tag` ヘルパーを使えば、アセットパイプラインがよしなにしてくれるので、`src` 属性に `"images/"` のようなディレクトリ名を含める必要はない (含めると読み込まれないことがある)
 - **Sass (Sassy CSS):**
-  - CSS をより効率的に書くための拡張言語 「Sassy」は「生意気な」という意味合い 変数やネスト、ミックスインなどの機能が使える
+  - CSS をより効率的に書くための拡張言語
+  - Sassy＝生意気な
+  - 変数やネスト、ミックスインなどの機能が使える
 - **`rails db:seed`:**
-  - `db/seeds.rb` ファイルに記述された初期データ（サンプルデータ）をデータベースに投入するコマンド 開発初期やテストデータの準備に便利
+  - `db/seeds.rb` ファイルに記述された初期データ（サンプルデータ）をデータベースに投入するコマンド
+  - テストデータの準備が楽ちん
 
 ### Ruby の概念・記法 (Rails でよく使われるもの)
 
-- **ダックタイピング (Duck Typing):**
+- **Duck Typing:**
   - オブジェクトの実際の型よりも、そのオブジェクトが特定のメソッドを持っているかどうか（振る舞えるか）を重視
   - Rails ではこの思想により柔軟なコードが書ける場面がある
 - **メモ化 (`||=` を使ったテクニック):**
   - `@変数 ||= 初期化処理` の形で、インスタンス変数が `nil` または `false` の場合にのみ初期化処理を実行し、その結果を変数に代入する
-  - 2 回目以降の呼び出しでは既に値がセットされているため、初期化処理（例: 負荷の高いデータベース検索）をスキップでき、パフォーマンス向上に繋がる
+  - 2 回目以降の呼び出しでは既に値がセットされているため初期化処理（例: 負荷の高いデータベース検索）をスキップでき、パフォーマンス向上に繋がる
   - `@変数 = @変数 || 初期化処理` とのわずかな違い:
     - `a = a || b`: `a`が真（`nil` や `false` 以外）の場合でも、`a`に`a`自身の値を再代入する処理が内部的に発生する
     - `a ||= b`: `a`が真の場合は、代入処理そのものが実行されない
@@ -107,18 +111,17 @@
   - `has_secure_password` メソッド:
     - これ自体に存在性バリデーションが含まれている
     - ただし、空白文字のみのパスワードは検知できない (別途バリデーションが必要な場合あり)
-    - `has_secure_password` による存在性バリデーションがあるため、`validates :password, presence: true, allow_nil: true` のように `allow_nil: true` を設定しても、新規ユーザー登録時にパスワードが空のまま通ることはない (ユーザー更新時など、パスワード変更が任意の場合に `allow_nil` が役立つ)
+    - 存在性バリデーションがあるため、`validates :password, presence: true, allow_nil: true` のように `allow_nil: true` を設定しても、新規ユーザー登録時にパスワードが空のまま通ることはない (ユーザー更新時など、パスワード変更が任意の場合に `allow_nil` が役立つ)
 - **`save` vs `update_attribute` (古い) vs `update_attributes` (古い) vs `update`:**
   - `save`: オブジェクトの現在の状態をデータベースに保存 新規作成時は INSERT、既存オブジェクトの場合は変更のあった属性のみを UPDATE する バリデーションを実行する
   - `update_attribute(:name, "new_name")`: (非推奨に近い) 特定の属性 1 つだけを更新し、即座に DB に保存 バリデーションをスキップする
   - `update_attributes(name: "new_name", email: "new@example.com")`: (非推奨) 複数の属性を一度に更新し、即座に DB に保存 バリデーションを実行する Rails 4 以降は `update` が推奨
-  - `update(name: "new_name", email: "new@example.com")`: `update_attributes` と同様の機能を持つ、より推奨される書き方 バリデーションを実行する
+  - `update(name: "new_name", email: "new@example.com")`: `update_attributes` と同様の機能を持つ、より推奨される書き方
 - **`default_scope`:**
   - モデルからデータを取得する際のデフォルトの並び順などを指定する
   - 例: `default_scope -> { order(created_at: :desc) }` (作成日時の降順をデフォルトにする)
   - `-> { ... }` はラムダ (無名関数) の記法
 - **`new` と `build` の違い (関連付けにおける):**
-
   - `Micropost.new(...)`: `Micropost` クラスの新しいインスタンスをメモリ上に作成 この時点では `user_id` は `nil`
   - `@user.microposts.build(...)`: `@user` に紐付いた `Micropost` クラスの新しいインスタンスをメモリ上に作成 この時点で、新しいマイクロポストの `user_id` には `@user.id` が自動的に設定される
   - どちらもデータベースにはまだ保存されず、保存するには `.save` メソッドが必要
